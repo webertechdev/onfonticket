@@ -8,9 +8,9 @@ export type TicketStatus =
   | 'COMPLETED'
   | 'UNATTENDED'
   | 'CANCELLED'
+  | 'REASSIGNED'
 
-export type PrintStatus = 'PENDING' | 'PRINTED' | 'FAILED' | 'RETRY_PENDING' | 'REPRINTED'
-
+export type PrintStatus = 'PENDING' | 'PRINTING' | 'PRINTED' | 'FAILED' | 'RETRY_PENDING' | 'REPRINTED'
 export type TellerMode = 'ALL SERVICES' | ServiceKey
 
 export interface ServiceDefinition {
@@ -43,10 +43,21 @@ export interface Teller {
   name: string
   counter: string
   mode: TellerMode
+  role?: string
 }
 
 export interface QueueSnapshot {
   tickets: Ticket[]
   tellers: Teller[]
   lastUpdatedAt: string
+}
+
+export interface DisplayCall {
+  id: string
+  number: string
+  service: ServiceKey
+  status: TicketStatus
+  callCount: number
+  lastCalledAt: string
+  counter: string
 }
