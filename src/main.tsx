@@ -59,7 +59,7 @@ function useDisplayQueue() {
 function AppShell() {
   const location = useLocation()
   const { session, loading } = useAuth()
-  const inviteCallback = typeof window !== 'undefined' && window.location.hash.includes('type=invite')
+  const inviteCallback = typeof window !== 'undefined' && (window.location.hash.includes('type=invite') || window.location.hash.includes('type=recovery'))
   const publicPaths = ['/', '/auth', '/kiosk', '/display']
   const protectedRoute = !publicPaths.includes(location.pathname)
   const role = location.pathname === '/kiosk' ? 'Customer kiosk' : location.pathname === '/display' ? 'Customer display' : location.pathname === '/manager' ? 'Risk Manager' : location.pathname === '/teller' ? 'Teller desk' : 'Operations'
