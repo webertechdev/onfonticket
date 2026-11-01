@@ -18,24 +18,40 @@ type KioskState = { step: KioskStep; service?: ServiceKey; phoneInput: string }
 type AuthState = { session: Session | null; loading: boolean }
 
 async function getStaffLandingPath(userId: string): Promise<'/manager' | '/teller'> {
-  const { data, error } = await supabase
+  // First retrieve the staff profile without an embedded role relationship.
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id,is_active,role:roles(name)')
+    .select('id,is_active,role_id')
     .eq('id', userId)
     .maybeSingle()
 
-  if (error) throw error
-  if (!data || !data.is_active) {
+  if (profileError) throw profileError
+
+  if (!profile || !profile.is_active) {
     throw new Error('Your ONFON staff profile is inactive or has not been activated. Contact a Risk Manager.')
   }
 
-  const roleData = data.role as unknown as { name?: string } | { name?: string }[] | null
-  const roleName = Array.isArray(roleData) ? roleData[0]?.name : roleData?.name
+  if (!profile.role_id) {
+    throw new Error('Your staff profile has no assigned role. Contact a Risk Manager.')
+  }
+
+  // Retrieve the role directly using the profile's role_id.
+  const { data: role, error: roleError } = await supabase
+    .from('roles')
+    .select('name')
+    .eq('id', profile.role_id)
+    .maybeSingle()
+
+  if (roleError) throw roleError
+
+  const roleName = role?.name?.trim().toUpperCase()
 
   if (roleName === 'RISK-MANAGER') return '/manager'
   if (roleName === 'RISK-OFFICER') return '/teller'
 
-  throw new Error('Your account does not have an authorised ONFON staff role.')
+  throw new Error(
+    `Your account role could not be recognised (received: ${roleName || 'none'}). Contact a Risk Manager.`
+  )
 }
 
 function StaffLanding({ session }: { session: Session }) {
