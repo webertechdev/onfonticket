@@ -127,10 +127,8 @@ function useDisplayQueue() {
 function AppShell() {
   const location = useLocation()
   const { session, loading } = useAuth()
-  const inviteCallback =
-    initialAuthCallbackType === 'invite' ||
-    initialAuthCallbackType === 'recovery'
-  const publicPaths = ['/', '/auth', '/kiosk', '/display']
+  const inviteCallback = initialAuthCallbackType === 'invite'
+  const publicPaths = ['/', '/auth', '/reset-password', '/kiosk', '/display']
   const protectedRoute = !publicPaths.includes(location.pathname)
   const role = location.pathname === '/kiosk' ? 'Customer kiosk' : location.pathname === '/display' ? 'Customer display' : location.pathname === '/manager' ? 'Risk Manager' : location.pathname === '/teller' ? 'Teller desk' : 'Operations'
   if (loading) return <div className="auth-loading"><img src="/onfon-logo.png" alt="ONFON Mobile" /><span>Connecting to ONFON secure access…</span></div>
@@ -143,6 +141,7 @@ function AppShell() {
     <Routes>
       <Route path="/" element={<Home session={session} />} />
       <Route path="/auth" element={session ? (inviteCallback ? <SetPasswordPage /> : <StaffLanding session={session} />) : <AuthPage />} />
+      <Route path="/reset-password" element={session && initialAuthCallbackType === 'recovery' ? <SetPasswordPage /> : <AuthPage />} />
       <Route path="/kiosk" element={<Kiosk />} />
       <Route path="/teller" element={<TellerDashboard session={session} />} />
       <Route path="/manager" element={<ManagerDashboard session={session} />} />
@@ -216,7 +215,7 @@ function AuthPage() {
     setBusy(true)
     try {
       const result = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: `${window.location.origin}/reset-password`,
       })
       if (result.error) throw result.error
       setSuccess('If this email belongs to an account, a password reset link has been sent. Check your inbox.')
@@ -275,6 +274,13 @@ function SetPasswordPage() {
       const userResult = await supabase.auth.getUser()
       if (userResult.error) throw userResult.error
       if (!userResult.data.user) throw new Error('Please request a new password link and try again.')
+
+      if (isRecovery) {
+        await supabase.auth.signOut()
+        window.history.replaceState({}, document.title, '/auth')
+        navigate('/auth', { replace: true })
+        return
+      }
 
       const destination = await getStaffLandingPath(userResult.data.user.id)
       window.history.replaceState({}, document.title, '/auth')
