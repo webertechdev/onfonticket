@@ -8,9 +8,10 @@ import { businessDate, formatTime, getService, isValidLocalPhone, maskPhone, SER
 import type { DisplayCall, QueueSnapshot, ServiceKey, Ticket, TellerMode } from './domain/types'
 import { realQueue } from './lib/realQueue'
 import { clearDraft, loadDraft, saveDraft } from './lib/draft'
-import { isSupabaseConfigured, supabase } from './lib/supabase'
+import { initialAuthCallbackType, isSupabaseConfigured, supabase } from './lib/supabase'
 import { ManagerWorkspace } from './components/ManagerWorkspace'
 import './styles.css'
+
 
 type KioskStep = 'welcome' | 'service' | 'phone' | 'review' | 'created'
 type KioskState = { step: KioskStep; service?: ServiceKey; phoneInput: string }
@@ -126,7 +127,9 @@ function useDisplayQueue() {
 function AppShell() {
   const location = useLocation()
   const { session, loading } = useAuth()
-  const inviteCallback = typeof window !== 'undefined' && (window.location.hash.includes('type=invite') || window.location.hash.includes('type=recovery'))
+  const inviteCallback =
+    initialAuthCallbackType === 'invite' ||
+    initialAuthCallbackType === 'recovery'
   const publicPaths = ['/', '/auth', '/kiosk', '/display']
   const protectedRoute = !publicPaths.includes(location.pathname)
   const role = location.pathname === '/kiosk' ? 'Customer kiosk' : location.pathname === '/display' ? 'Customer display' : location.pathname === '/manager' ? 'Risk Manager' : location.pathname === '/teller' ? 'Teller desk' : 'Operations'
@@ -249,7 +252,7 @@ function SetPasswordPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const isRecovery = window.location.hash.includes('type=recovery')
+  const isRecovery = initialAuthCallbackType === 'recovery'
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
