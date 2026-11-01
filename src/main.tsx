@@ -157,17 +157,22 @@ function AuthPage() {
   const [error, setError] = useState(() => {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     return params.get('error_code') === 'otp_expired'
-      ? 'This invitation link has expired. Ask a Risk Manager to resend the invitation.'
+      ? 'This password reset or invitation link has expired. Request a new link or contact a Risk Manager.'
       : ''
   })
+  const [success, setSuccess] = useState('')
   const navigate = useNavigate()
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setBusy(true)
     setError('')
+    setSuccess('')
     try {
-      const result = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      const result = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
       if (result.error) throw result.error
       if (!result.data.user) throw new Error('Unable to verify your staff account.')
       const destination = await getStaffLandingPath(result.data.user.id)
@@ -180,47 +185,107 @@ function AuthPage() {
     }
   }
 
+  const requestPasswordReset = async () => {
+    setError('')
+    setSuccess('')
+
+    if (!email.trim()) {
+      setError('Enter your staff email address first.')
+      return
+    }
+
+    setBusy(true)
+    try {
+      const result = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/auth`,
+      })
+      if (result.error) throw result.error
+      setSuccess('If this email belongs to an account, a password reset link has been sent. Check your inbox.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to send the password reset email.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return <main className="auth-page"><div className="auth-card">
     <img className="auth-logo" src="/onfon-logo.png" alt="ONFON Mobile" />
     <p className="eyebrow">ONFON MOBILE / STAFF ACCESS</p>
     <h1>Sign in to operations</h1>
-    <p className="auth-copy">Use the staff email and password provided through your ONFON invitation.</p>
+    <p className="auth-copy">Use your invited ONFON staff email and password.</p>
     <form onSubmit={submit} className="auth-form">
-      <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@onfon.co.ke" /></label>
+      <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@onfonmobile.com" /></label>
       <label>Password<input type="password" autoComplete="current-password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" /></label>
       {error && <p className="form-error">{error}</p>}
-      <button className="button primary large" disabled={busy}>{busy ? 'Connecting…' : 'Sign in'} <ArrowRight size={18} /></button>
+      {success && <p className="auth-copy" role="status">{success}</p>}
+      <button className="button primary large" disabled={busy}>{busy ? 'Please wait…' : 'Sign in'} <ArrowRight size={18} /></button>
+      <button type="button" className="text-button" onClick={() => void requestPasswordReset()} disabled={busy}>
+        Forgot password? Send reset email
+      </button>
     </form>
     <p className="auth-copy">Staff accounts can only be created through invitations from an ONFON Risk Manager.</p>
     <Link className="auth-back" to="/"><ArrowLeft size={16} /> Back to ONFON</Link>
   </div></main>
 }
-
 function SetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const isRecovery = window.location.hash.includes('type=recovery')
+
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setError('')
-    if (password.length < 8) { setError('Use at least 8 characters.'); return }
-    if (password !== confirmation) { setError('Passwords do not match.'); return }
+    event.preventDefault()
+    setError('')
+
+    if (password.length < 8) {
+      setError('Use at least 8 characters.')
+      return
+    }
+    if (password !== confirmation) {
+      setError('Passwords do not match.')
+      return
+    }
+
     setBusy(true)
     try {
       const result = await supabase.auth.updateUser({ password })
       if (result.error) throw result.error
+
       const userResult = await supabase.auth.getUser()
       if (userResult.error) throw userResult.error
-      if (!userResult.data.user) throw new Error('Please sign in again to complete staff activation.')
+      if (!userResult.data.user) throw new Error('Please request a new password link and try again.')
+
       const destination = await getStaffLandingPath(userResult.data.user.id)
       window.history.replaceState({}, document.title, '/auth')
       navigate(destination, { replace: true })
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Password setup failed.') } finally { setBusy(false) }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Password update failed.')
+    } finally {
+      setBusy(false)
+    }
   }
-  return <main className="auth-page"><div className="auth-card"><img className="auth-logo" src="/onfon-logo.png" alt="ONFON Mobile" /><p className="eyebrow">ONFON MOBILE / INVITATION ACTIVATION</p><h1>Create your new password</h1><p className="auth-copy">Your invitation is valid. Create a private password to activate your ONFON staff account.</p><form onSubmit={submit} className="auth-form"><label>New password<input type="password" autoFocus autoComplete="new-password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 8 characters" /></label><label>Confirm password<input type="password" autoComplete="new-password" minLength={8} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="Repeat your new password" /></label>{error && <p className="form-error">{error}</p>}<button className="button primary large" disabled={busy}>{busy ? 'Saving password…' : 'Activate staff account'} <ArrowRight size={18} /></button></form><Link className="auth-back" to="/"><ArrowLeft size={16} /> Back to ONFON</Link></div></main>
-}
 
+  return <main className="auth-page"><div className="auth-card">
+    <img className="auth-logo" src="/onfon-logo.png" alt="ONFON Mobile" />
+    <p className="eyebrow">ONFON MOBILE / {isRecovery ? 'PASSWORD RECOVERY' : 'INVITATION ACTIVATION'}</p>
+    <h1>{isRecovery ? 'Reset your password' : 'Create your new password'}</h1>
+    <p className="auth-copy">{isRecovery
+      ? 'Choose a new password for your ONFON staff account.'
+      : 'Create a private password to activate your ONFON staff account.'}</p>
+    <form onSubmit={submit} className="auth-form">
+      <label>New password<input type="password" autoFocus autoComplete="new-password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 8 characters" /></label>
+      <label>Confirm password<input type="password" autoComplete="new-password" minLength={8} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="Repeat your new password" /></label>
+      {error && <p className="form-error">{error}</p>}
+      <button className="button primary large" disabled={busy}>
+        {busy ? 'Saving password…' : isRecovery ? 'Save new password' : 'Activate staff account'}
+        <ArrowRight size={18} />
+      </button>
+    </form>
+    <Link className="auth-back" to="/"><ArrowLeft size={16} /> Back to ONFON</Link>
+  </div></main>
+}
 function Kiosk() {
   const persisted = loadDraft()
   const [draft, setDraft] = useState<KioskState>({ step: persisted?.step ?? 'welcome', service: persisted?.service as ServiceKey | undefined, phoneInput: persisted?.phoneInput ?? '' })
