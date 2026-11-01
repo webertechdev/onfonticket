@@ -30,7 +30,7 @@ export type HistoryRow = { id: number; ticket_id: string; from_status: string | 
 export type AuditRow = { id: number; actor_id: string | null; action: string; entity_type: string | null; entity_id: string | null; reason: string | null; previous_values: unknown; new_values: unknown; created_at: string }
 export type PrintRow = { id: string; ticket_id: string; status: string; attempt_count: number; idempotency_key: string; error_message: string | null; requested_by: string | null; created_at: string; updated_at: string }
 export type AssignmentRow = { id: number; ticket_id: string; teller_id: string; assigned_at: string; released_at: string | null; assignment_reason: string | null }
-export type StaffRow = { id: string; full_name: string; counter_name: string | null; service_mode: string; is_active: boolean; created_at: string; updated_at: string; role?: { name: string } | { name: string }[] | null }
+export type StaffRow = { id: string; full_name: string; phone_number: string | null; staff_number: string | null; counter_name: string | null; service_mode: string; is_active: boolean; created_at: string; updated_at: string; role?: { name: string } | { name: string }[] | null }
 export type ServiceRow = { id: string; key: ServiceKey; name: string; prefix: string; colour: string; soft_colour: string; is_active: boolean; display_order: number }
 export type SettingRow = { key: string; value: unknown; updated_by: string | null; updated_at: string }
 
@@ -65,7 +65,7 @@ export const managerData = {
     return finish(query, filters)
   },
   async staff(filters: DateFilters): Promise<PageResult<StaffRow>> {
-    let query = supabase.from('profiles').select('id,full_name,counter_name,service_mode,is_active,created_at,updated_at,role:roles(name)', { count: 'exact' }).order('created_at', { ascending: false })
+    let query = supabase.from('profiles').select('id,full_name,phone_number,staff_number,counter_name,service_mode,is_active,created_at,updated_at,role:roles(name)', { count: 'exact' }).order('created_at', { ascending: false })
     query = applyDates(query, 'created_at', filters)
     if (filters.search.trim()) query = query.ilike('full_name', `%${filters.search.trim()}%`)
     return finish(query, filters)
@@ -80,13 +80,18 @@ export const managerData = {
     return finish(query, filters)
   },
   async updateStaff(id: string, values: { full_name: string; counter_name: string | null; service_mode: string; is_active: boolean; role: 'RISK-MANAGER' | 'RISK-OFFICER' }): Promise<void> {
-    const roleResult = await supabase.from('roles').select('id').eq('name', values.role).single()
-    if (roleResult.error || !roleResult.data) throw new Error(roleResult.error?.message ?? 'Role not found.')
-    const result = await supabase.from('profiles').update({ full_name: values.full_name, counter_name: values.counter_name, service_mode: values.service_mode, is_active: values.is_active, role_id: roleResult.data.id, updated_at: new Date().toISOString() }).eq('id', id)
+    const result = await supabase.rpc('manager_update_staff_profile', {
+      p_profile_id: id,
+      p_full_name: values.full_name,
+      p_counter_name: values.counter_name,
+      p_service_mode: values.service_mode,
+      p_is_active: values.is_active,
+      p_role: values.role,
+    })
     if (result.error) throw new Error(result.error.message)
   },
-  async inviteStaff(email: string, fullName: string, role: 'RISK-MANAGER' | 'RISK-OFFICER'): Promise<void> {
-    const result = await supabase.functions.invoke('manager-invite-user', { body: { email, fullName, role } })
+  async inviteStaff(email: string, fullName: string, phoneNumber: string, staffNumber: string, role: 'RISK-MANAGER' | 'RISK-OFFICER'): Promise<void> {
+    const result = await supabase.functions.invoke('manager-invite-user', { body: { email, fullName, phoneNumber, staffNumber, role } })
     if (result.error) throw new Error(result.error.message)
     if ((result.data as { error?: string } | null)?.error) throw new Error((result.data as { error: string }).error)
   },

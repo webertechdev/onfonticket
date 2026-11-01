@@ -17,7 +17,58 @@ type KioskState = { step: KioskStep; service?: ServiceKey; phoneInput: string }
 
 type AuthState = { session: Session | null; loading: boolean }
 
-const PUBLIC_APP_URL = 'https://onfonticket.pages.dev'
+async function getStaffLandingPath(userId: string): Promise<'/manager' | '/teller'> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id,is_active,role:roles(name)')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data || !data.is_active) {
+    throw new Error('Your ONFON staff profile is inactive or has not been activated. Contact a Risk Manager.')
+  }
+
+  const roleData = data.role as unknown as { name?: string } | { name?: string }[] | null
+  const roleName = Array.isArray(roleData) ? roleData[0]?.name : roleData?.name
+
+  if (roleName === 'RISK-MANAGER') return '/manager'
+  if (roleName === 'RISK-OFFICER') return '/teller'
+
+  throw new Error('Your account does not have an authorised ONFON staff role.')
+}
+
+function StaffLanding({ session }: { session: Session }) {
+  const [destination, setDestination] = useState<'/manager' | '/teller' | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    void getStaffLandingPath(session.user.id)
+      .then((path) => { if (active) setDestination(path) })
+      .catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : 'Unable to verify your staff access.')
+      })
+    return () => { active = false }
+  }, [session.user.id])
+
+  if (destination) return <Navigate to={destination} replace />
+  if (error) return (
+    <main className="auth-page">
+      <div className="auth-card">
+        <img className="auth-logo" src="/onfon-logo.png" alt="ONFON Mobile" />
+        <p className="eyebrow">ONFON MOBILE / STAFF ACCESS</p>
+        <h1>Access not available</h1>
+        <p className="form-error">{error}</p>
+        <button className="button primary large" onClick={() => void supabase.auth.signOut()}>
+          Sign out
+        </button>
+      </div>
+    </main>
+  )
+  return <div className="auth-loading"><img src="/onfon-logo.png" alt="ONFON Mobile" /><span>Checking your ONFON staff access…</span></div>
+}
+
 
 function useAuth(): AuthState {
   const [session, setSession] = useState<Session | null>(null)
@@ -72,7 +123,7 @@ function AppShell() {
     </header>
     <Routes>
       <Route path="/" element={<Home session={session} />} />
-      <Route path="/auth" element={session ? (inviteCallback ? <SetPasswordPage /> : <Navigate to="/teller" replace />) : <AuthPage />} />
+      <Route path="/auth" element={session ? (inviteCallback ? <SetPasswordPage /> : <StaffLanding session={session} />) : <AuthPage />} />
       <Route path="/kiosk" element={<Kiosk />} />
       <Route path="/teller" element={<TellerDashboard session={session} />} />
       <Route path="/manager" element={<ManagerDashboard session={session} />} />
@@ -100,31 +151,49 @@ function Home({ session }: { session: Session | null }) {
 }
 
 function AuthPage() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
   const [error, setError] = useState(() => {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-    return params.get('error_code') === 'otp_expired' ? 'This invitation link has expired. Ask a Risk Manager to resend the invitation.' : ''
+    return params.get('error_code') === 'otp_expired'
+      ? 'This invitation link has expired. Ask a Risk Manager to resend the invitation.'
+      : ''
   })
   const navigate = useNavigate()
+
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setMessage(''); setError('')
+    event.preventDefault()
+    setBusy(true)
+    setError('')
     try {
-      if (mode === 'signin') {
-        const result = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-        if (result.error) throw result.error
-        navigate('/teller', { replace: true })
-      } else {
-        const result = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: `${PUBLIC_APP_URL}/auth` } })
-        if (result.error) throw result.error
-        setMessage(result.data.session ? 'Account created. Your invited staff profile will be available after approval.' : 'Invitation account created. Check the invited email to confirm access, then sign in.')
-      }
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Authentication failed.') } finally { setBusy(false) }
+      const result = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      if (result.error) throw result.error
+      if (!result.data.user) throw new Error('Unable to verify your staff account.')
+      const destination = await getStaffLandingPath(result.data.user.id)
+      navigate(destination, { replace: true })
+    } catch (cause) {
+      await supabase.auth.signOut()
+      setError(cause instanceof Error ? cause.message : 'Authentication failed.')
+    } finally {
+      setBusy(false)
+    }
   }
-  return <main className="auth-page"><div className="auth-card"><img className="auth-logo" src="/onfon-logo.png" alt="ONFON Mobile" /><p className="eyebrow">ONFON MOBILE / STAFF ACCESS</p><h1>{mode === 'signin' ? 'Sign in to operations' : 'Activate an invitation'}</h1><p className="auth-copy">{mode === 'signin' ? 'Use the invited staff email for teller and manager access.' : 'Only continue if you received an ONFON staff invitation.'}</p><form onSubmit={submit} className="auth-form"><label>Email address<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@onfon.co.ke" /></label><label>Password<input type="password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 8 characters" /></label>{error && <p className="form-error">{error}</p>}{message && <p className="form-success">{message}</p>}<button className="button primary large" disabled={busy}>{busy ? 'Connecting…' : mode === 'signin' ? 'Sign in' : 'Create invited account'} <ArrowRight size={18} /></button></form><button className="text-button" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMessage(''); setError('') }}>{mode === 'signin' ? 'Have an invitation? Activate account' : 'Already activated? Sign in'}</button><Link className="auth-back" to="/"><ArrowLeft size={16} /> Back to ONFON</Link></div></main>
+
+  return <main className="auth-page"><div className="auth-card">
+    <img className="auth-logo" src="/onfon-logo.png" alt="ONFON Mobile" />
+    <p className="eyebrow">ONFON MOBILE / STAFF ACCESS</p>
+    <h1>Sign in to operations</h1>
+    <p className="auth-copy">Use the staff email and password provided through your ONFON invitation.</p>
+    <form onSubmit={submit} className="auth-form">
+      <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@onfon.co.ke" /></label>
+      <label>Password<input type="password" autoComplete="current-password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" /></label>
+      {error && <p className="form-error">{error}</p>}
+      <button className="button primary large" disabled={busy}>{busy ? 'Connecting…' : 'Sign in'} <ArrowRight size={18} /></button>
+    </form>
+    <p className="auth-copy">Staff accounts can only be created through invitations from an ONFON Risk Manager.</p>
+    <Link className="auth-back" to="/"><ArrowLeft size={16} /> Back to ONFON</Link>
+  </div></main>
 }
 
 function SetPasswordPage() {
@@ -141,8 +210,12 @@ function SetPasswordPage() {
     try {
       const result = await supabase.auth.updateUser({ password })
       if (result.error) throw result.error
+      const userResult = await supabase.auth.getUser()
+      if (userResult.error) throw userResult.error
+      if (!userResult.data.user) throw new Error('Please sign in again to complete staff activation.')
+      const destination = await getStaffLandingPath(userResult.data.user.id)
       window.history.replaceState({}, document.title, '/auth')
-      navigate('/teller', { replace: true })
+      navigate(destination, { replace: true })
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Password setup failed.') } finally { setBusy(false) }
   }
   return <main className="auth-page"><div className="auth-card"><img className="auth-logo" src="/onfon-logo.png" alt="ONFON Mobile" /><p className="eyebrow">ONFON MOBILE / INVITATION ACTIVATION</p><h1>Create your new password</h1><p className="auth-copy">Your invitation is valid. Create a private password to activate your ONFON staff account.</p><form onSubmit={submit} className="auth-form"><label>New password<input type="password" autoFocus autoComplete="new-password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 8 characters" /></label><label>Confirm password<input type="password" autoComplete="new-password" minLength={8} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="Repeat your new password" /></label>{error && <p className="form-error">{error}</p>}<button className="button primary large" disabled={busy}>{busy ? 'Saving password…' : 'Activate staff account'} <ArrowRight size={18} /></button></form><Link className="auth-back" to="/"><ArrowLeft size={16} /> Back to ONFON</Link></div></main>

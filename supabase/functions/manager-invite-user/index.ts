@@ -25,20 +25,33 @@ Deno.serve(async (request) => {
   const admin = createClient(supabaseUrl, serviceRoleKey)
   const { data: callerProfile, error: profileError } = await admin
     .from('profiles')
-    .select('id,role:roles(name)')
+    .select('id,is_active,role:roles(name)')
     .eq('id', callerData.user.id)
     .maybeSingle()
   const roleName = Array.isArray(callerProfile?.role) ? callerProfile.role[0]?.name : (callerProfile?.role as { name?: string } | null)?.name
-  if (profileError || roleName !== 'RISK-MANAGER') return json({ error: 'NOT_AUTHORISED' }, 403)
+  if (profileError || !callerProfile?.is_active || roleName !== 'RISK-MANAGER') {
+   return json({ error: 'NOT_AUTHORISED' }, 403)
+ }
 
-  let body: { email?: string; fullName?: string; role?: 'RISK-MANAGER' | 'RISK-OFFICER' }
+  let body: { email?: string; fullName?: string; phoneNumber?: string; staffNumber?: string; role?: 'RISK-MANAGER' | 'RISK-OFFICER' }
   try { body = await request.json() } catch { return json({ error: 'INVALID_JSON' }, 400) }
   const email = body.email?.trim().toLowerCase()
   const fullName = body.fullName?.trim() || email?.split('@')[0] || 'ONFON staff'
   const requestedRole = body.role === 'RISK-MANAGER' ? 'RISK-MANAGER' : 'RISK-OFFICER'
+ const phoneNumber = body.phoneNumber?.trim() || null
+ const staffNumber = body.staffNumber?.trim() || null
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) return json({ error: 'INVALID_EMAIL' }, 400)
 
-  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+  if (staffNumber) {
+   const { data: existingStaff, error: staffCheckError } = await admin
+     .from('profiles')
+     .select('id')
+     .ilike('staff_number', staffNumber)
+     .limit(1)
+   if (staffCheckError) return json({ error: staffCheckError.message }, 500)
+   if (existingStaff?.length) return json({ error: 'STAFF_NUMBER_ALREADY_EXISTS' }, 409)
+ }
+ const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo: 'https://onfonticket.pages.dev/auth',
     data: { full_name: fullName },
   })
@@ -46,7 +59,7 @@ Deno.serve(async (request) => {
 
   const { data: roleRow, error: roleError } = await admin.from('roles').select('id').eq('name', requestedRole).single()
   if (roleError || !roleRow) return json({ error: 'ROLE_NOT_FOUND' }, 500)
-  const { error: updateError } = await admin.from('profiles').update({ full_name: fullName, role_id: roleRow.id, is_active: true, updated_at: new Date().toISOString() }).eq('id', invited.user.id)
+  const { error: updateError } = await admin.from('profiles').update({ full_name: fullName, phone_number: phoneNumber, staff_number: staffNumber, role_id: roleRow.id, is_active: true, updated_at: new Date().toISOString() }).eq('id', invited.user.id)
   if (updateError) return json({ error: updateError.message }, 500)
 
   return json({ userId: invited.user.id, email, role: requestedRole })
