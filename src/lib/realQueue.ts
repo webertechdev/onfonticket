@@ -52,6 +52,7 @@ function asError(error: { message?: string } | null): Error {
   if (message.includes('INVALID_PHONE')) return new Error('INVALID_PHONE')
   if (message.includes('NOT_AUTHORISED')) return new Error('NOT_AUTHORISED')
   if (message.includes('THREE_CALLS_REQUIRED')) return new Error('THREE_CALLS_REQUIRED')
+  if (message.includes('ACTIVE_CALL_EXISTS')) return new Error('ACTIVE_CALL_EXISTS')
   return new Error(message)
 }
 
