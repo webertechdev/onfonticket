@@ -33,8 +33,18 @@ export type AssignmentRow = { id: number; ticket_id: string; teller_id: string; 
 export type StaffRow = { id: string; full_name: string; phone_number: string | null; staff_number: string | null; counter_name: string | null; service_mode: string; is_active: boolean; created_at: string; updated_at: string; role?: { name: string } | { name: string }[] | null }
 export type ServiceRow = { id: string; key: ServiceKey; name: string; prefix: string; colour: string; soft_colour: string; is_active: boolean; display_order: number }
 export type SettingRow = { key: string; value: unknown; updated_by: string | null; updated_at: string }
+export type Directory = { profiles: Array<{ id: string; full_name: string; staff_number: string | null; phone_number: string | null; counter_name: string | null; role?: { name: string } | { name: string }[] | null }>; tickets: Array<{ id: string; display_number: string }> }
 
 export const managerData = {
+  async directory(): Promise<Directory> {
+    const [profiles, tickets] = await Promise.all([
+      supabase.from('profiles').select('id,full_name,staff_number,phone_number,counter_name,role:roles(name)').order('full_name'),
+      supabase.from('tickets').select('id,display_number').order('created_at', { ascending: false }),
+    ])
+    if (profiles.error) throw new Error(profiles.error.message)
+    if (tickets.error) throw new Error(tickets.error.message)
+    return { profiles: (profiles.data ?? []) as Directory['profiles'], tickets: (tickets.data ?? []) as Directory['tickets'] }
+  },
   async tickets(filters: DateFilters): Promise<PageResult<ManagerTicketRow>> {
     let query = supabase.from('tickets').select('id,display_number,phone_canonical,business_date,registered_at,status,print_status,call_count,repeat_visit,queue_sequence,teller_id,service:services(key,name)', { count: 'exact' }).order('registered_at', { ascending: false })
     query = applyDates(query, 'business_date', filters)

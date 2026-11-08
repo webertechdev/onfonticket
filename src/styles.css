@@ -40,3 +40,11 @@
 .form-success { color: #26764c; background: #e6f5e9; border: 1px solid #c9e8d0; }
 .form-error { color: #a64a3e; background: #fff0ed; border: 1px solid #f1d4ce; }
 @media (max-width: 760px) { .workspace-toolbar { flex-direction: column; } .manager-workspace { padding: 17px; } .manager-tabs { margin-left: -17px; margin-right: -17px; padding-left: 17px; padding-right: 17px; } .manager-filters { align-items: stretch; flex-direction: column; } .manager-filters label, .search-input, .search-input input, .filter-button { width: 100%; } .invite-form { grid-template-columns: 1fr; } .pagination { justify-content: space-between; flex-wrap: wrap; } }
+
+/* Staff navigation and account actions */
+.role-nav { display: inline-flex; align-items: center; gap: 5px; }
+.role-nav a { color: #637581; padding: 7px 9px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+.role-nav a:hover, .role-nav a.active { color: #171717; background: #edf4ee; }
+.topbar-logout { min-height: 36px; padding: 0 11px; color: #a63d38 !important; border-color: #ebc7c2 !important; background: #fff8f6 !important; }
+.topbar-logout:hover { background: #fff0ed !important; border-color: #dca39d !important; }
+@media (max-width: 760px) { .topbar-right { gap: 8px; } .connection { display: none; } .role-nav a { padding: 6px; font-size: 10px; } .topbar-logout { padding: 0 8px; } .topbar-logout svg { display: none; } }

@@ -128,16 +128,27 @@ function useDisplayQueue() {
 function AppShell() {
   const location = useLocation()
   const { session, loading } = useAuth()
+  const [appRole, setAppRole] = useState<'RISK-MANAGER' | 'RISK-OFFICER' | null>(null)
   const inviteCallback = initialAuthCallbackType === 'invite'
   const publicPaths = ['/', '/auth', '/reset-password', '/kiosk', '/display']
   const protectedRoute = !publicPaths.includes(location.pathname)
   const role = location.pathname === '/kiosk' ? 'Customer kiosk' : location.pathname === '/display' ? 'Customer display' : location.pathname === '/manager' ? 'Risk Manager' : location.pathname === '/teller' ? 'Teller desk' : 'Operations'
+  useEffect(() => {
+    let active = true
+    if (!session) { setAppRole(null); return () => { active = false } }
+    void supabase.from('profiles').select('role:roles(name)').eq('id', session.user.id).maybeSingle().then(({ data }) => {
+      if (!active) return
+      const value = Array.isArray(data?.role) ? data.role[0]?.name : (data?.role as unknown as { name?: string } | null)?.name
+      setAppRole(value === 'RISK-MANAGER' || value === 'RISK-OFFICER' ? value : null)
+    })
+    return () => { active = false }
+  }, [session?.user.id])
   if (loading) return <div className="auth-loading"><img src="/onfon-logo.png" alt="ONFON Mobile" /><span>Connecting to ONFON secure access…</span></div>
   if (protectedRoute && !session) return <Navigate to="/auth" replace state={{ from: location.pathname }} />
   return <div className="app-shell">
     <header className="topbar">
       <Link className="brand" to="/"><img className="brand-logo" src="/onfon-logo.png" alt="ONFON Mobile logo" /><span><strong>ONFON MOBILE</strong><small>Risk Department</small></span></Link>
-      <div className="topbar-right"><span className="connection"><span className="status-dot" /> {isSupabaseConfigured ? 'Live Supabase' : 'Backend not configured'}</span><span className="current-role">{role}</span>{session && <button className="icon-button topbar-logout" onClick={() => void supabase.auth.signOut()} aria-label="Sign out"><LogOut size={17} /></button>}</div>
+      <div className="topbar-right"><span className="connection"><span className="status-dot" /> {isSupabaseConfigured ? 'Live Supabase' : 'Backend not configured'}</span>{session && <nav className="role-nav" aria-label="Staff navigation">{appRole && <Link className={location.pathname === '/teller' ? 'active' : ''} to="/teller">Teller desk</Link>}{appRole === 'RISK-MANAGER' && <Link className={location.pathname === '/manager' ? 'active' : ''} to="/manager">Manager</Link>}</nav>}<span className="current-role">{role}</span>{session && <button className="button secondary topbar-logout" onClick={() => void supabase.auth.signOut()} aria-label="Sign out"><LogOut size={16} /> Sign out</button>}</div>
     </header>
     <Routes>
       <Route path="/" element={<Home session={session} />} />
