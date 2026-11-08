@@ -337,12 +337,24 @@ function Kiosk() {
 
 function KioskHeading({ step, title, subtitle }: { step: string; title: string; subtitle: string }) { return <div className="kiosk-heading"><span className="eyebrow">{step}</span><h1>{title}</h1><p>{subtitle}</p></div> }
 function KioskNav({ onBack, onNext, nextLabel = 'Next', nextDisabled, message }: { onBack: () => void; onNext: () => void; nextLabel?: string; nextDisabled?: boolean; message: string }) { return <div className="kiosk-nav"><button className="button secondary" onClick={onBack}><ArrowLeft size={17} /> Back</button><span className="nav-message">{message}</span><button className="button primary" disabled={nextDisabled} onClick={onNext}>{nextLabel} <ArrowRight size={17} /></button></div> }
-function announceCall(ticket: Ticket, counter: string): void {
+function preferredEnglishVoice(): SpeechSynthesisVoice | undefined {
+  const voices = window.speechSynthesis.getVoices().filter((voice) => /^en(-|_)/i.test(voice.lang))
+  return voices.find((voice) => /^en[-_]KE$/i.test(voice.lang))
+    ?? voices.find((voice) => /female|woman|susan|zira|samantha|karen|moira|google uk english female/i.test(voice.name))
+    ?? voices.find((voice) => /^en[-_]GB$/i.test(voice.lang))
+    ?? voices.find((voice) => /^en[-_]US$/i.test(voice.lang))
+    ?? voices[0]
+}
+function announceCall(ticket: Pick<Ticket, 'number'>, counter: string): void {
   if (!('speechSynthesis' in window)) return
   const tellerNumber = counter.replace(/^teller\s*(?:number\s*)?/i, '').trim()
   window.speechSynthesis.cancel()
   const announcement = new SpeechSynthesisUtterance(`Ticket ${ticket.number}, please proceed to Teller number ${tellerNumber || counter}`)
-  announcement.rate = 0.95
+  const voice = preferredEnglishVoice()
+  if (voice) { announcement.voice = voice; announcement.lang = voice.lang }
+  else announcement.lang = 'en-KE'
+  announcement.rate = 0.88
+  announcement.pitch = 1.08
   announcement.volume = 1
   window.speechSynthesis.speak(announcement)
 }
@@ -380,7 +392,7 @@ function DisplayBoard() {
   const [sound, setSound] = useState(true)
   const lastSpoken = useRef('')
   const current = calls[0]
-  useEffect(() => { if (!sound || !current || !('speechSynthesis' in window)) return; const key = `${current.id}:${current.callCount}`; if (lastSpoken.current === key) return; lastSpoken.current = key; const tellerNumber = current.counter.replace(/^teller\s*(?:number\s*)?/i, '').trim(); window.speechSynthesis.cancel(); const announcement = new SpeechSynthesisUtterance(`Ticket ${current.number}, please proceed to Teller number ${tellerNumber || current.counter}`); announcement.rate = 0.95; announcement.volume = 1; window.speechSynthesis.speak(announcement) }, [current?.id, current?.callCount, sound])
+  useEffect(() => { if (!sound || !current || !('speechSynthesis' in window)) return; const key = `${current.id}:${current.callCount}`; if (lastSpoken.current === key) return; lastSpoken.current = key; announceCall(current, current.counter) }, [current?.id, current?.callCount, sound])
   return <main className="display-page"><div className="display-top"><Link className="brand" to="/"><img className="brand-logo" src="/onfon-logo.png" alt="ONFON Mobile logo" /><span><strong>ONFON MOBILE</strong><small>Risk Department</small></span></Link><div className="display-controls"><span className="display-live"><span className="pulse" /> Live call board</span><button className="icon-button" onClick={() => setSound(!sound)} aria-label={sound ? 'Mute announcements' : 'Enable announcements'}>{sound ? <Volume2 /> : <VolumeX />}</button><Link to="/teller" className="button secondary">Staff view</Link></div></div><div className="display-content"><p className="eyebrow">PLEASE PROCEED WHEN YOUR NUMBER IS CALLED</p>{current ? <><div className="display-ticket-label">NOW CALLING</div><div className="display-ticket">{current.number}</div><div className="display-service"><span className="service-marker" style={{ background: getService(current.service).color }} />{getService(current.service).name}<span className="display-divider" />{current.counter}</div><p className="display-message">Please proceed to {current.counter}.</p></> : <><div className="display-idle"><TicketIcon size={54} /><strong>{error ? 'Display feed unavailable' : 'Thank you for waiting'}</strong><span>{error || 'The next ticket will appear here.'}</span></div></>}</div><div className="display-footer"><span><ShieldCheck size={15} /> No phone numbers are shown on this display</span><span>{new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Nairobi', timeStyle: 'short' }).format(new Date())}</span></div></main>
 }
 
