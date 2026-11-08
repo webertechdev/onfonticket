@@ -153,7 +153,7 @@ export const realQueue = {
     const result = await supabase.rpc('recall_ticket', { p_ticket_id: ticketId }) as ApiResult<{ ticket?: RawTicket }>
     if (result.error) {
       const message = result.error.message
-      if (message.includes('WAIT_30_SECONDS')) return { ok: false, message: 'Wait 30 seconds between calls.' }
+      if (message.includes('WAIT_10_SECONDS')) return { ok: false, message: 'Wait 10 seconds between calls.' }
       if (message.includes('THREE_CALLS_REACHED')) return { ok: false, message: 'This ticket has reached the three-call limit.' }
       return { ok: false, message }
     }
