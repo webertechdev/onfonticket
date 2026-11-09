@@ -48,3 +48,15 @@
 .topbar-logout { min-height: 36px; padding: 0 11px; color: #a63d38 !important; border-color: #ebc7c2 !important; background: #fff8f6 !important; }
 .topbar-logout:hover { background: #fff0ed !important; border-color: #dca39d !important; }
 @media (max-width: 760px) { .topbar-right { gap: 8px; } .connection { display: none; } .role-nav a { padding: 6px; font-size: 10px; } .topbar-logout { padding: 0 8px; } .topbar-logout svg { display: none; } }
+
+.counter-setup { margin: 0 0 20px; display: flex; align-items: end; justify-content: space-between; gap: 22px; background: #f7f9f8; border-color: #cfe2d5; }
+.counter-setup h2 { margin: 0 0 7px; font-family: 'Space Grotesk', sans-serif; font-size: 21px; }
+.counter-setup p:not(.eyebrow) { max-width: 640px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.counter-setup-actions { display: flex; align-items: end; gap: 9px; flex-shrink: 0; }
+.counter-setup-actions label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.counter-setup-actions input { width: 95px; min-height: 42px; border: 1px solid #b8ccc0; border-radius: 9px; padding: 0 12px; background: white; font-size: 18px; font-weight: 700; text-align: center; outline: 0; }
+.counter-setup-actions input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(21,154,104,.12); }
+@media (max-width: 760px) { .counter-setup { align-items: stretch; flex-direction: column; } .counter-setup-actions { align-items: end; flex-wrap: wrap; } }
+
+.staff-actions { display: flex; flex-wrap: wrap; gap: 5px; min-width: 220px; }
+.staff-actions .button { min-height: 31px; padding: 0 8px; font-size: 10px; }

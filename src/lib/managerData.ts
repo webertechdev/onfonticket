@@ -25,11 +25,11 @@ const finish = async <T>(query: any, filters: DateFilters): Promise<PageResult<T
   return { rows: (result.data ?? []) as T[], total: result.count ?? 0 }
 }
 
-export type ManagerTicketRow = { id: string; display_number: string; phone_canonical: string; business_date: string; registered_at: string; status: TicketStatus; print_status: string; call_count: number; repeat_visit: boolean; queue_sequence: number; service?: { key: ServiceKey; name: string } | { key: ServiceKey; name: string }[] | null; teller_id: string | null }
+export type ManagerTicketRow = { id: string; display_number: string; phone_canonical: string; business_date: string; registered_at: string; status: TicketStatus; print_status: string; call_count: number; repeat_visit: boolean; queue_sequence: number; service?: { key: ServiceKey; name: string } | { key: ServiceKey; name: string }[] | null; teller_id: string | null; counter_name: string | null }
 export type HistoryRow = { id: number; ticket_id: string; from_status: string | null; to_status: string; event_type: string; actor_id: string | null; reason: string | null; created_at: string; ticket?: { display_number: string; phone_canonical: string } | null }
 export type AuditRow = { id: number; actor_id: string | null; action: string; entity_type: string | null; entity_id: string | null; reason: string | null; previous_values: unknown; new_values: unknown; created_at: string }
 export type PrintRow = { id: string; ticket_id: string; status: string; attempt_count: number; idempotency_key: string; error_message: string | null; requested_by: string | null; created_at: string; updated_at: string }
-export type AssignmentRow = { id: number; ticket_id: string; teller_id: string; assigned_at: string; released_at: string | null; assignment_reason: string | null }
+export type AssignmentRow = { id: number; ticket_id: string; teller_id: string; counter_name: string | null; assigned_at: string; released_at: string | null; assignment_reason: string | null }
 export type StaffRow = { id: string; full_name: string; phone_number: string | null; staff_number: string | null; counter_name: string | null; service_mode: string; is_active: boolean; created_at: string; updated_at: string; role?: { name: string } | { name: string }[] | null }
 export type ServiceRow = { id: string; key: ServiceKey; name: string; prefix: string; colour: string; soft_colour: string; is_active: boolean; display_order: number }
 export type SettingRow = { key: string; value: unknown; updated_by: string | null; updated_at: string }
@@ -46,7 +46,7 @@ export const managerData = {
     return { profiles: (profiles.data ?? []) as Directory['profiles'], tickets: (tickets.data ?? []) as Directory['tickets'] }
   },
   async tickets(filters: DateFilters): Promise<PageResult<ManagerTicketRow>> {
-    let query = supabase.from('tickets').select('id,display_number,phone_canonical,business_date,registered_at,status,print_status,call_count,repeat_visit,queue_sequence,teller_id,service:services(key,name)', { count: 'exact' }).order('registered_at', { ascending: false })
+    let query = supabase.from('tickets').select('id,display_number,phone_canonical,business_date,registered_at,status,print_status,call_count,repeat_visit,queue_sequence,teller_id,counter_name,service:services(key,name)', { count: 'exact' }).order('registered_at', { ascending: false })
     query = applyDates(query, 'business_date', filters)
     if (filters.search.trim()) query = query.or(`display_number.ilike.%${filters.search.trim()}%,phone_canonical.ilike.%${filters.search.trim()}%`)
     return finish(query, filters)
@@ -70,7 +70,7 @@ export const managerData = {
     return finish(query, filters)
   },
   async assignments(filters: DateFilters): Promise<PageResult<AssignmentRow>> {
-    let query = supabase.from('teller_assignments').select('id,ticket_id,teller_id,assigned_at,released_at,assignment_reason', { count: 'exact' }).order('assigned_at', { ascending: false })
+    let query = supabase.from('teller_assignments').select('id,ticket_id,teller_id,counter_name,assigned_at,released_at,assignment_reason', { count: 'exact' }).order('assigned_at', { ascending: false })
     query = applyDates(query, 'assigned_at', filters)
     return finish(query, filters)
   },
