@@ -173,7 +173,7 @@ export const realQueue = {
   async setMode(tellerId: string, mode: TellerMode): Promise<void> {
     const userId = await currentUserId()
     if (userId !== tellerId) throw new Error('Only the signed-in teller can change their mode.')
-    const result = await supabase.from('profiles').update({ service_mode: mode, updated_at: new Date().toISOString() }).eq('id', tellerId)
+    const result = await supabase.rpc('set_my_service_mode', { p_service_mode: mode })
     if (result.error) throw asError(result.error)
   },
   async setCounter(tellerId: string, counterNumber: string): Promise<void> {
@@ -181,7 +181,7 @@ export const realQueue = {
     if (userId !== tellerId) throw new Error('Only the signed-in teller can change their counter.')
     const counter = counterNumber.trim()
     if (!/^\d{1,2}$/.test(counter) || Number(counter) < 1) throw new Error('Enter a valid counter number such as 1, 2, or 3.')
-    const result = await supabase.from('profiles').update({ counter_name: counter, updated_at: new Date().toISOString() }).eq('id', tellerId)
+    const result = await supabase.rpc('set_my_counter', { p_counter_name: counter })
     if (result.error) throw asError(result.error)
   },
 
