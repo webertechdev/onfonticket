@@ -148,7 +148,10 @@ export const realQueue = {
   async claimNext(mode: TellerMode): Promise<Ticket | undefined> {
     const result = await supabase.rpc('claim_next_ticket', { p_mode: mode }) as ApiResult<{ ticket?: RawTicket | null }>
     if (result.error) throw asError(result.error)
-    return result.data?.ticket ? mapTicket(result.data.ticket) : undefined
+    const claimed = result.data?.ticket
+    if (!claimed) return undefined
+    const refreshed = await supabase.from('tickets').select('id,display_number,service_id,service:services(key),phone_canonical,registered_at,business_date,queue_sequence,status,print_status,call_count,last_called_at,teller_id,repeat_visit,notes').eq('id', claimed.id).maybeSingle() as ApiResult<RawTicket>
+    return mapTicket(refreshed.data ?? claimed, mode === 'ALL SERVICES' ? undefined : mode)
   },
 
   async recall(ticketId: string): Promise<{ ok: boolean; message?: string }> {

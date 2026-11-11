@@ -100,6 +100,10 @@ export const managerData = {
     })
     if (result.error) throw new Error(result.error.message)
   },
+  async manageStaffAccount(id: string, action: 'suspend' | 'reactivate' | 'archive' | 'promote' | 'demote', reason: string): Promise<void> {
+    const result = await supabase.rpc('manager_manage_staff_account', { p_profile_id: id, p_action: action, p_reason: reason })
+    if (result.error) throw new Error(result.error.message)
+  },
   async inviteStaff(email: string, fullName: string, phoneNumber: string, staffNumber: string, role: 'RISK-MANAGER' | 'RISK-OFFICER'): Promise<void> {
     const result = await supabase.functions.invoke('manager-invite-user', { body: { email, fullName, phoneNumber, staffNumber, role } })
     if (result.error) throw new Error(result.error.message)
