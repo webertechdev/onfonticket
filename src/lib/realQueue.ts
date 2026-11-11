@@ -48,7 +48,7 @@ function mapTicket(raw: RawTicket, fallbackService?: ServiceKey): Ticket {
 
 function asError(error: { message?: string } | null): Error {
   const message = error?.message ?? 'The live backend request failed.'
-  if (message.includes('ACTIVE_TICKET_EXISTS')) return new Error('ACTIVE_TICKET_EXISTS')
+  if (message.includes('ACTIVE_TICKET_EXISTS') || message.includes('tickets_one_active_phone_idx')) return new Error('ACTIVE_TICKET_EXISTS')
   if (message.includes('INVALID_PHONE')) return new Error('INVALID_PHONE')
   if (message.includes('NOT_AUTHORISED')) return new Error('NOT_AUTHORISED')
   if (message.includes('THREE_CALLS_REQUIRED')) return new Error('THREE_CALLS_REQUIRED')
