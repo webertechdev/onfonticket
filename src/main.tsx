@@ -358,9 +358,10 @@ function preferredEnglishVoice(): SpeechSynthesisVoice | undefined {
 }
 function announceCall(ticket: Pick<Ticket, 'number'>, counter: string): void {
   if (!('speechSynthesis' in window)) return
-  const tellerNumber = counter.replace(/^teller\s*(?:number\s*)?/i, '').trim()
+  const tellerNumber = counter.replace(/^teller\s*(?:number\s*)?/i, '').replace(/\D/g, '').split('').join(' ')
+  const spokenTicket = ticket.number.replace(/[^A-Za-z0-9]/g, '').split('').join(' ')
   window.speechSynthesis.cancel()
-  const announcement = new SpeechSynthesisUtterance(`Ticket ${ticket.number}, please proceed to Teller number ${tellerNumber || counter}`)
+  const announcement = new SpeechSynthesisUtterance(`${spokenTicket}, please proceed to Teller number ${tellerNumber || counter}`)
   const voice = preferredEnglishVoice()
   if (voice) { announcement.voice = voice; announcement.lang = voice.lang }
   else announcement.lang = 'en-KE'
