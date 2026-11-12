@@ -23,3 +23,19 @@ Ticket creation is completed in Supabase before printing. A browser print failur
 ## When the thermal printer is purchased
 
 Keep the same ticket data and print job records. Replace only the local print transport with a USB ESC/POS or QZ Tray/local-agent transport, preserving the 58 mm CSS/layout measurements and the existing idempotency key. Do not expose a printer port or printer credentials to the public internet.
+
+## Approved pilot printer decision — P58E with perforated paper
+
+The approved low-cost pilot configuration is the P58E Bluetooth 58 mm thermal printer used with the Tecno MegaPad SE Android tablet and **58 mm perforated thermal receipt paper**. The perforation replaces the need for an automatic cutter: the printer feeds the completed ticket to the tear line and the customer or attendant tears it cleanly by hand.
+
+Purchase and verify paper that is:
+
+- 57–58 mm wide and compatible with the P58E paper compartment;
+- direct-thermal and BPA-compliant where available;
+- supplied as a continuous roll with regular pre-cut perforations;
+- narrow enough that the perforation does not rub against the printer guides;
+- tested for reliable feeding without curling, slipping, or double-feeding.
+
+Do not modify the P58E to install an internal cutter. Do not use a separate exposed blade at the kiosk. If a manual cutter is later required, use only a guarded commercial 58 mm paper trimmer positioned away from customer reach; the preferred pilot method remains the integrated tear edge plus perforated paper.
+
+The first physical acceptance test must print at least ten tickets from the Tecno MegaPad SE over Bluetooth. Each ticket must stop at or close to the perforation, remain readable, tear without damaging the ticket number, and leave the next ticket ready for printing. Test one new roll, a nearly empty roll, and a repeated print after a simulated Bluetooth or paper-feed interruption.
