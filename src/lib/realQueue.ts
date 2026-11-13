@@ -49,6 +49,7 @@ function mapTicket(raw: RawTicket, fallbackService?: ServiceKey): Ticket {
 function asError(error: { message?: string } | null): Error {
   const message = error?.message ?? 'The live backend request failed.'
   if (message.includes('ACTIVE_TICKET_EXISTS') || message.includes('tickets_one_active_phone_idx')) return new Error('ACTIVE_TICKET_EXISTS')
+  if (message.includes('digest(text') || message.includes('function digest') || message.includes('does not exist')) return new Error('TICKET_SERVICE_UNAVAILABLE')
   if (message.includes('INVALID_PHONE')) return new Error('INVALID_PHONE')
   if (message.includes('NOT_AUTHORISED')) return new Error('NOT_AUTHORISED')
   if (message.includes('THREE_CALLS_REQUIRED')) return new Error('THREE_CALLS_REQUIRED')
@@ -135,6 +136,7 @@ export const realQueue = {
     } catch (error) {
       if (error instanceof Error && error.message === 'ACTIVE_TICKET_EXISTS') return { error: 'This phone number already has an active ticket. Please ask staff to reprint it.' }
       if (error instanceof Error && error.message === 'SUPABASE_NOT_CONFIGURED') return { error: 'The live ticketing backend is not configured on this device.' }
+      if (error instanceof Error && error.message === 'TICKET_SERVICE_UNAVAILABLE') return { error: 'Ticketing is temporarily unavailable. Please wait a moment and try again, or ask the Risk Team for assistance.' }
       if (error instanceof Error && error.message === 'INVALID_PHONE') return { error: 'Enter a valid Kenyan number beginning with 07 or 01.' }
       return { error: error instanceof Error ? error.message : 'Ticket creation failed. Please try again.' }
     }
