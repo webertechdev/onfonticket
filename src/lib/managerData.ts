@@ -34,8 +34,19 @@ export type StaffRow = { id: string; full_name: string; phone_number: string | n
 export type ServiceRow = { id: string; key: ServiceKey; name: string; prefix: string; colour: string; soft_colour: string; is_active: boolean; display_order: number }
 export type SettingRow = { key: string; value: unknown; updated_by: string | null; updated_at: string }
 export type Directory = { profiles: Array<{ id: string; full_name: string; staff_number: string | null; phone_number: string | null; counter_name: string | null; role?: { name: string } | { name: string }[] | null }>; tickets: Array<{ id: string; display_number: string }> }
+export type SystemHealth = { ok: boolean; checked_at: string; checks: Array<{ key: string; label: string; ok: boolean; detail: string }> }
 
 export const managerData = {
+  async systemHealth(): Promise<SystemHealth> {
+    const result = await supabase.rpc('manager_system_health')
+    if (result.error) throw new Error(result.error.message)
+    return result.data as SystemHealth
+  },
+  async repairSafeDatabase(): Promise<SystemHealth> {
+    const result = await supabase.rpc('manager_repair_safe_database')
+    if (result.error) throw new Error(result.error.message)
+    return result.data as SystemHealth
+  },
   async directory(): Promise<Directory> {
     const [profiles, tickets] = await Promise.all([
       supabase.from('profiles').select('id,full_name,staff_number,phone_number,counter_name,role:roles(name)').order('full_name'),

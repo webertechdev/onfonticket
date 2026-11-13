@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, Search, UserPlus } from 'lucide-react'
-import type { DateFilters, Directory, PageResult, PageSize, ManagerTicketRow, HistoryRow, AuditRow, PrintRow, AssignmentRow, StaffRow, ServiceRow, SettingRow } from '../lib/managerData'
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, RefreshCw, Search, UserPlus, Wrench } from 'lucide-react'
+import type { DateFilters, Directory, PageResult, PageSize, ManagerTicketRow, HistoryRow, AuditRow, PrintRow, AssignmentRow, StaffRow, ServiceRow, SettingRow, SystemHealth } from '../lib/managerData'
 import { managerData } from '../lib/managerData'
 import type { TellerMode } from '../domain/types'
 
@@ -34,6 +34,9 @@ export function ManagerWorkspace() {
   const [inviteStaffNumber, setInviteStaffNumber] = useState('')
   const [inviteRole, setInviteRole] = useState<'RISK-OFFICER' | 'RISK-MANAGER'>('RISK-OFFICER')
   const [directory, setDirectory] = useState<Directory>({ profiles: [], tickets: [] })
+  const [health, setHealth] = useState<SystemHealth | null>(null)
+  const [healthBusy, setHealthBusy] = useState(false)
+  const [healthError, setHealthError] = useState('')
   const profileName = (id: string | null | undefined) => directory.profiles.find((profile) => profile.id === id)?.full_name ?? (id ? `Staff (${id.slice(0, 8)})` : 'System')
   const ticketName = (id: string | null | undefined) => directory.tickets.find((ticket) => ticket.id === id)?.display_number ?? (id ? `Ticket (${id.slice(0, 8)})` : '—')
 
@@ -46,19 +49,28 @@ export function ManagerWorkspace() {
   }
   useEffect(() => { void load() }, [tab, filters.page, filters.pageSize])
   useEffect(() => { void managerData.directory().then(setDirectory).catch(() => undefined) }, [])
+  useEffect(() => { void checkHealth() }, [])
   const totalPages = filters.pageSize === 'all' ? 1 : Math.max(1, Math.ceil(result.total / filters.pageSize))
   const update = (values: Partial<DateFilters>) => setFilters((current) => ({ ...current, ...values, page: values.page ?? 1 }))
   const invite = async (event: React.FormEvent) => { event.preventDefault(); setNotice(''); try { await managerData.inviteStaff(inviteEmail, inviteName, invitePhone, inviteStaffNumber, inviteRole); setNotice(`Invitation sent to ${inviteEmail}.`); setInviteEmail(''); setInviteName(''); setInvitePhone(''); setInviteStaffNumber(''); setInviteOpen(false); await load() } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invitation failed.') } }
+  const checkHealth = async () => { setHealthBusy(true); setHealthError(''); try { setHealth(await managerData.systemHealth()) } catch (cause) { setHealthError(cause instanceof Error ? cause.message : 'Health check failed.') } finally { setHealthBusy(false) } }
+  const repairDatabase = async () => { setHealthBusy(true); setHealthError(''); setNotice(''); try { setHealth(await managerData.repairSafeDatabase()); setNotice('Safe database repair completed and was recorded in the audit log.') } catch (cause) { setHealthError(cause instanceof Error ? cause.message : 'Safe repair failed.') } finally { setHealthBusy(false) } }
 
   return <section className="manager-workspace panel">
     <div className="workspace-toolbar"><div><p className="eyebrow">MANAGER CONTROL CENTRE</p><h2>Historical records & administration</h2><p>Search every operational table, including previous business days. Internal staff views show the full phone number.</p></div><button className="button primary" onClick={() => setInviteOpen(!inviteOpen)}><UserPlus size={17} /> Invite staff</button></div>
     {inviteOpen && <form className="invite-form" onSubmit={invite}><label>Staff email<input type="email" required value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="name@onfonmobile.com" /></label><label>Full name<input required value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="Full name" /></label><label>Staff phone number<input type="tel" value={invitePhone} onChange={(event) => setInvitePhone(event.target.value)} placeholder="e.g. 0712345678" /></label><label>Staff number<input value={inviteStaffNumber} onChange={(event) => setInviteStaffNumber(event.target.value)} placeholder="Employee/staff ID (optional)" /></label><label>Role<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as typeof inviteRole)}><option value="RISK-OFFICER">Risk Officer</option><option value="RISK-MANAGER">Risk Manager</option></select></label><button className="button primary" type="submit">Send invitation</button></form>}
+    <SystemHealthPanel health={health} busy={healthBusy} error={healthError} onCheck={() => void checkHealth()} onRepair={() => void repairDatabase()} />
     <div className="manager-tabs">{tabs.map((item) => <button className={tab === item.key ? 'active' : ''} key={item.key} onClick={() => { setTab(item.key); setFilters(emptyFilters(filters.pageSize)); setNotice('') }}>{item.label}</button>)}</div>
     <div className="manager-filters"><label>Search<div className="search-input"><Search size={15} /><input value={filters.search} onChange={(event) => update({ search: event.target.value })} placeholder="Ticket, phone, action, name…" onKeyDown={(event) => { if (event.key === 'Enter') void load() }} /></div></label><label>From<input type="date" value={filters.from} onChange={(event) => update({ from: event.target.value })} /></label><label>To<input type="date" value={filters.to} onChange={(event) => update({ to: event.target.value })} /></label><label>Rows<select value={String(filters.pageSize)} onChange={(event) => update({ pageSize: event.target.value === 'all' ? 'all' : Number(event.target.value) as 5 | 100 })}><option value="5">5</option><option value="100">100</option><option value="all">All</option></select></label><button className="button secondary filter-button" onClick={() => void load()}>Apply filters</button></div>
     {notice && <div className="form-success">{notice}</div>}{error && <div className="form-error">{error}</div>}
     {loading ? <div className="loading-panel">Loading records…</div> : <ManagerTable tab={tab} rows={result.rows} profileName={profileName} ticketName={ticketName} onStaffSaved={async () => { await load(); setDirectory(await managerData.directory()) }} />}
     <div className="pagination"><span>{result.total} records</span><button className="button quiet" disabled={filters.page <= 1 || loading} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}><ArrowLeft size={15} /> Previous</button><strong>Page {filters.page} of {totalPages}</strong><button className="button quiet" disabled={filters.page >= totalPages || loading} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}>Next <ArrowRight size={15} /></button></div>
   </section>
+}
+
+function SystemHealthPanel({ health, busy, error, onCheck, onRepair }: { health: SystemHealth | null; busy: boolean; error: string; onCheck: () => void; onRepair: () => void }) {
+  const confirmRepair = () => { if (window.confirm('DEVOPS-ONLY DANGER ZONE\n\nThis changes the database search path used by the ticket-creation function and writes an audit entry. It can affect new customer ticket registration if misused, but it does not delete tickets, change staff roles, or alter queue history. Continue only with DevOps approval.')) onRepair() }
+  return <section className="system-health-card"><div className="system-health-head"><div><p className="eyebrow">SHORT TROUBLESHOOTING</p><h3>Supabase system health</h3><p>Check the database, ticket RPC, hashing setup, and live counter updates in one click.</p></div><div className="system-health-actions"><button className="button secondary" onClick={onCheck} disabled={busy}><RefreshCw size={15} /> {busy ? 'Checking…' : 'Check system'}</button><button className="button danger-zone-button" onClick={confirmRepair} disabled={busy}><Wrench size={15} /> DEVOPS ONLY: repair</button></div></div><div className="danger-zone-warning"><strong>Danger zone — DevOps only</strong><span>The repair action changes only the ticket-creation function configuration. It may affect new registrations if applied incorrectly. It does not delete tickets, reset counters, change roles, or remove audit history. Run the read-only check first.</span></div>{error && <div className="form-error">{error}</div>}{health && <div className="health-check-list">{health.checks.map((check) => <div className={`health-check ${check.ok ? 'ok' : 'bad'}`} key={check.key}><span>{check.ok ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}</span><div><strong>{check.label}</strong><small>{check.detail}</small></div></div>)}</div>}<p className="system-health-note">Shortest troubleshooting path: 1) Check system. 2) Read the red check. 3) Only DevOps confirms and uses repair. 4) If still red, apply the named migration in Supabase SQL editor and recheck.</p></section>
 }
 
 function ManagerTable({ tab, rows, profileName, ticketName, onStaffSaved }: { tab: Tab; rows: Row[]; profileName: (id: string | null | undefined) => string; ticketName: (id: string | null | undefined) => string; onStaffSaved: () => Promise<void> }) {
